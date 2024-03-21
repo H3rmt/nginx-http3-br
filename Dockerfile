@@ -1,77 +1,43 @@
 FROM alpine:latest as builder
 
-ENV NGINX_VERSION 1.25.2
-ENV NJS_VERSION 0.8.0
+ENV NGINX_VERSION 1.25.4
+ENV NJS_VERSION 0.8.3
+ENV BORINGSSL_BRANCH chromium-stable
+ENV BROTLI_BRANCH master
 
-# Build-time metadata as defined at https://label-schema.org
 ARG BUILD_DATE
 ARG VCS_REF
 
 # install dependencies
-RUN addgroup -S nginx \
-  && adduser -D -S -h /var/cache/nginx -s /sbin/nologin -G nginx nginx \
-  && apk update \
-  && apk upgrade \
-  && apk add --no-cache ca-certificates openssl \
-  && update-ca-certificates \
-  && apk add --no-cache --virtual .build-deps \
-  gcc \
-  libc-dev \
-  make \
-  pcre-dev \
-  zlib-dev \
-  linux-headers \
-  gnupg \
-  libxslt-dev \
-  gd-dev \
-  geoip-dev \
-  perl-dev \
-  && apk add --no-cache --virtual .brotli-build-deps \
-  autoconf \
-  libtool \
-  automake \
-  git \
-  g++ \
-  cmake \
-  go \
-  perl \
-  rust \
-  cargo \
-  patch \
-  libxml2-dev \
-  byacc \
-  flex \
-  libstdc++ \
-  libmaxminddb-dev \
-  lmdb-dev \
-  file \
-  openrc 
+RUN addgroup -S nginx && adduser -D -S -h /var/cache/nginx -s /sbin/nologin -G nginx nginx \
+  && apk update && apk upgrade \
+  && apk add --no-cache ca-certificates openssl && update-ca-certificates
+RUN apk add --no-cache --virtual .build-deps \
+  gcc libc-dev make pcre-dev zlib-dev linux-headers \
+  gnupg libxslt-dev gd-dev geoip-dev perl-dev 
+RUN apk add --no-cache --virtual .brotli-build-deps \
+  autoconf libtool automake git g++ cmake go \
+  perl rust cargo  patch libxml2-dev byacc flex \
+  libstdc++ libmaxminddb-dev lmdb-dev file openrc 
+
+RUN mkdir /usr/src
 
 # build boringssl
-RUN mkdir /usr/src \
-  && cd /usr/src \
-  && git clone --branch chromium-stable https://boringssl.googlesource.com/boringssl \
-  && cd boringssl \
-  && mkdir build \
-  && cd ./build \
-  && cmake .. \
-  && make 
+RUN cd /usr/src \
+  && git clone --branch $BORINGSSL_BRANCH --depth=1 --recursive --shallow-submodules https://boringssl.googlesource.com/boringssl && cd boringssl \
+  && mkdir build && cd ./build \
+  && cmake .. && make 
 
 # clone brotli and njs
 RUN cd /usr/src \
-  && git clone --depth=1 --recursive --shallow-submodules https://github.com/google/ngx_brotli \
+  && git clone --branch $BROTLI_BRANCH --depth=1 --recursive --shallow-submodules https://github.com/google/ngx_brotli \
   && git clone --branch $NJS_VERSION --depth=1 --recursive --shallow-submodules https://github.com/nginx/njs 
 
 # clone & configure nginx
 RUN cd /usr/src \
   && wget -qO nginx.tar.gz https://nginx.org/download/nginx-$NGINX_VERSION.tar.gz \
-  && wget -qO nginx.tar.gz.asc https://nginx.org/download/nginx-$NGINX_VERSION.tar.gz.asc \
-  && rm -rf "$GNUPGHOME" nginx.tar.gz.asc \
-  && tar -zxC /usr/src -f nginx.tar.gz \
-  && rm nginx.tar.gz \
-  && cd /usr/src/nginx-$NGINX_VERSION \
-  && mkdir /root/.cargo \
-  && echo $'[net]\ngit-fetch-with-cli = true' > /root/.cargo/config.toml \
+  && tar -zxC /usr/src -f nginx.tar.gz && rm nginx.tar.gz && cd /usr/src/nginx-$NGINX_VERSION \
+  # && mkdir /root/.cargo && echo $'[net]\ngit-fetch-with-cli = true' > /root/.cargo/config.toml \
   && ./configure --prefix=/etc/nginx \
   --sbin-path=/usr/sbin/nginx \
   --modules-path=/usr/lib/nginx/modules \
@@ -124,15 +90,16 @@ RUN cd /usr/src \
   --with-cc-opt=-Wno-error \
   --with-select_module \
   --with-poll_module \
-  --build="docker-nginx-http3-$VCS_REF-$BUILD_DATE ngx_brotli-$(git --git-dir=/usr/src/ngx_brotli/.git rev-parse --short HEAD) njs-$(git --git-dir=/usr/src/njs/.git rev-parse --short HEAD)" \ 
   --with-cc-opt="-I/usr/src/boringssl/include" \
-  --with-ld-opt="-L/usr/src/boringssl/build/crypto -L/usr/src/boringssl/build/ssl"
+  --with-ld-opt="-L/usr/src/boringssl/build/crypto -L/usr/src/boringssl/build/ssl" \
+  --build="docker-nginx-$VCS_REF-$BUILD_DATE boringssl-$(git --git-dir=/usr/src/boringssl/.git rev-parse --short HEAD) ngx_brotli-$(git --git-dir=/usr/src/ngx_brotli/.git rev-parse --short HEAD) njs-$(git --git-dir=/usr/src/njs/.git rev-parse --short HEAD)"
 
 # build nginx
 RUN cd /usr/src/nginx-$NGINX_VERSION \
   && make -j$(getconf _NPROCESSORS_ONLN) \
   && make -j$(getconf _NPROCESSORS_ONLN) install
 
+# clean container
 RUN cd /usr/src/nginx-$NGINX_VERSION \
   && rm -rf /etc/nginx/html/ \
   && mkdir /etc/nginx/conf.d/ \
@@ -157,7 +124,7 @@ RUN cd /usr/src/nginx-$NGINX_VERSION \
   && apk del .brotli-build-deps \
   && apk del .build-deps \
   && apk del .gettext \
-  && rm -rf /root/.cargo \
+  # && rm -rf /root/.cargo \
   && rm -rf /var/cache/apk/* \
   && mv /tmp/envsubst /usr/local/bin/ \
   # forward request and error logs to docker log collector to get output
