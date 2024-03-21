@@ -2,6 +2,7 @@ FROM alpine:latest as builder
 
 ENV NGINX_VERSION 1.25.2
 ENV NJS_VERSION 0.8.0
+ENV BORINGSSL="/tmp/boring-nginx"
 
 # Build-time metadata as defined at https://label-schema.org
 ARG BUILD_DATE
@@ -56,6 +57,16 @@ RUN mkdir /usr/src \
   && cd ./build \
   && cmake .. \
   && make 
+  # Make an .openssl directory for nginx and then symlink BoringSSL's include directory tree
+  # && mkdir -p "$BORINGSSL/boringssl/.openssl/lib" \
+  # && cd "$BORINGSSL/boringssl/.openssl" \
+  # && ln -s ../include include \
+  # Copy the BoringSSL crypto libraries to .openssl/lib so nginx can find them
+  # && cd "$BORINGSSL/boringssl" \
+  # && cp "build/crypto/libcrypto.a" ".openssl/lib" \
+  # && cp "build/ssl/libssl.a" ".openssl/lib" 
+
+# RUN ls -la $BORINGSSL/boringssl &&  ls -la $BORINGSSL/boringssl/.openssl/lib &&  ls -la $BORINGSSL/boringssl/build &&  ls -la $BORINGSSL/boringssl/include/openssl && exit 1
 
 # clone brotli and njs
 RUN cd /usr/src \
@@ -125,13 +136,18 @@ RUN cd /usr/src \
   --with-select_module \
   --with-poll_module \
   --build="docker-nginx-http3-$VCS_REF-$BUILD_DATE ngx_brotli-$(git --git-dir=/usr/src/ngx_brotli/.git rev-parse --short HEAD) njs-$(git --git-dir=/usr/src/njs/.git rev-parse --short HEAD)" \ 
-  # --with-cc-opt="-g -O2 -fPIE -fstack-protector-all -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security -I/usr/src/boringssl/include" \
-  # --with-ld-opt="-Wl,-Bsymbolic-functions -Wl,-z,relro -L/usr/src/boringssl/build/crypto -L/usr/src/boringssl/build/ssl"
+  # --with-openssl="$BORINGSSL/boringssl" \
+  # --with-cc-opt="-g -O2 -fPIE -fstack-protector-all -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security -I $BORINGSSL/boringssl/.openssl/include/" \
+  # --with-ld-opt="-Wl,-Bsymbolic-functions -Wl,-z,relro -L $BORINGSSL/boringssl/.openssl/lib/"
   --with-cc-opt="-I/usr/src/boringssl/include" \
-  --with-ld-opt="-L/usr/src/boringssl/build/ssl"
+  --with-ld-opt="-L/usr/src/boringssl/build/ssl -L/usr/src/boringssl/build/crypto"
+
+# RUN ls -la "/usr/src/boringssl/include" && ls  -la "/usr/src/boringssl/build" && ls  -la "/usr/src/boringssl/build/crypto" &&  ls -la "/usr/src/boringssl/build/ssl" && exit 1
+# RUN cat "$BORINGSSL/boringssl/.openssl/include/openssl/ssl.h" && exit 1
 
 # build nginx
 RUN cd /usr/src/nginx-$NGINX_VERSION \
+  # && touch "../boringssl/include/openssl/ssl.h" \
   && make -j$(getconf _NPROCESSORS_ONLN) \
   && make -j$(getconf _NPROCESSORS_ONLN) install
 
