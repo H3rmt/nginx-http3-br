@@ -37,7 +37,6 @@ RUN cd /usr/src \
 RUN cd /usr/src \
   && wget -qO nginx.tar.gz https://nginx.org/download/nginx-$NGINX_VERSION.tar.gz \
   && tar -zxC /usr/src -f nginx.tar.gz && rm nginx.tar.gz && cd /usr/src/nginx-$NGINX_VERSION \
-  # && mkdir /root/.cargo && echo $'[net]\ngit-fetch-with-cli = true' > /root/.cargo/config.toml \
   && ./configure --prefix=/etc/nginx \
   --sbin-path=/usr/sbin/nginx \
   --modules-path=/usr/lib/nginx/modules \
@@ -124,7 +123,6 @@ RUN cd /usr/src/nginx-$NGINX_VERSION \
   && apk del .brotli-build-deps \
   && apk del .build-deps \
   && apk del .gettext \
-  # && rm -rf /root/.cargo \
   && rm -rf /var/cache/apk/* \
   && mv /tmp/envsubst /usr/local/bin/ \
   # forward request and error logs to docker log collector to get output
