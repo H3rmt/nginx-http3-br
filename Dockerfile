@@ -5,8 +5,7 @@ ENV NJS_VERSION 0.8.3
 ENV BORINGSSL_BRANCH chromium-stable
 ENV BROTLI_BRANCH master
 
-ARG BUILD_DATE
-ARG VCS_REF
+ARG TAG=unspecified
 
 # install dependencies
 RUN addgroup -S nginx && adduser -D -S -h /var/cache/nginx -s /sbin/nologin -G nginx nginx \
@@ -91,7 +90,7 @@ RUN cd /usr/src \
   --with-poll_module \
   --with-cc-opt="-I/usr/src/boringssl/include" \
   --with-ld-opt="-L/usr/src/boringssl/build/crypto -L/usr/src/boringssl/build/ssl" \
-  --build="docker-nginx-$VCS_REF-$BUILD_DATE boringssl-$(git --git-dir=/usr/src/boringssl/.git rev-parse --short HEAD) ngx_brotli-$(git --git-dir=/usr/src/ngx_brotli/.git rev-parse --short HEAD) njs-$(git --git-dir=/usr/src/njs/.git rev-parse --short HEAD)"
+  --build="docker-nginx ($TAG) boringssl-$(git --git-dir=/usr/src/boringssl/.git rev-parse --short HEAD) ngx_brotli-$(git --git-dir=/usr/src/ngx_brotli/.git rev-parse --short HEAD) njs-$(git --git-dir=/usr/src/njs/.git rev-parse --short HEAD)"
 
 # build nginx
 RUN cd /usr/src/nginx-$NGINX_VERSION \
