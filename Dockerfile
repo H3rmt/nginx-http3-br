@@ -128,7 +128,10 @@ RUN cd /usr/src/nginx-$NGINX_VERSION \
   && ln -sf /dev/stdout /var/log/nginx/access.log \
   && ln -sf /dev/stderr /var/log/nginx/error.log 
 
-EXPOSE 80 443
+COPY docker-entrypoint.sh /docker-entrypoint.sh
 
+EXPOSE 80 443
 STOPSIGNAL SIGTERM
-CMD ["nginx", "-g", "daemon off;"]
+
+ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["nginx", "-g", "daemon off;", "-g", "error_log /var/log/nginx/error.log notice;"]
