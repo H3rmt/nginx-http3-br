@@ -96,7 +96,7 @@ RUN cd /usr/src/nginx-$NGINX_VERSION && ./configure \
   --with-select_module \
   --with-poll_module \
   --with-openssl=/usr/src/libressl \
-  --build="docker-nginx ($TAG) libressl-$(git --git-dir=/usr/src/libressl/.git rev-parse --short HEAD) ngx_brotli-$(git --git-dir=/usr/src/ngx_brotli/.git rev-parse --short HEAD) njs-$(git --git-dir=/usr/src/njs/.git rev-parse --short HEAD)"
+  --build="docker-nginx ($TAG) $LIBRESSL_VERSION ngx_brotli-$(git --git-dir=/usr/src/ngx_brotli/.git rev-parse --short HEAD) njs-$(git --git-dir=/usr/src/njs/.git rev-parse --short HEAD)"
 
 # build nginx
 RUN cd /usr/src/nginx-$NGINX_VERSION \
