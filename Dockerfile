@@ -1,8 +1,8 @@
-FROM alpine:latest as builder
+FROM alpine:latest AS builder
 
 ENV NGINX_VERSION 1.27.2
 ENV NJS_VERSION 0.8.7
-ENV BORINGSSL_BRANCH chromium-stable
+ENV LIBRESSL_VERSION=libressl-4.0.0
 ENV BROTLI_BRANCH master
 
 ARG TAG=unspecified
@@ -21,22 +21,29 @@ RUN apk add --no-cache --virtual .brotli-build-deps \
 
 RUN mkdir /usr/src
 
-# build boringssl
+# download libressl
 RUN cd /usr/src \
-  && git clone --branch $BORINGSSL_BRANCH --depth=1 --recursive --shallow-submodules https://boringssl.googlesource.com/boringssl && cd boringssl \
-  && mkdir build && cd ./build \
-  && cmake .. && make 
+  && wget https://ftp.openbsd.org/pub/OpenBSD/LibreSSL/$LIBRESSL_VERSION.tar.gz \
+  && tar xzf $LIBRESSL_VERSION.tar.gz \
+  && rm $LIBRESSL_VERSION.tar.gz \
+  && mv $LIBRESSL_VERSION libressl
+
+# RUN ls -la /usr/src/libressl && exit 1
 
 # clone brotli and njs
 RUN cd /usr/src \
   && git clone --branch $BROTLI_BRANCH --depth=1 --recursive --shallow-submodules https://github.com/google/ngx_brotli \
-  && git clone --branch $NJS_VERSION --depth=1 --recursive --shallow-submodules https://github.com/nginx/njs 
+  && git clone --branch $NJS_VERSION   --depth=1 --recursive --shallow-submodules https://github.com/nginx/njs 
 
-# clone & configure nginx
+# clone nginx
 RUN cd /usr/src \
   && wget -qO nginx.tar.gz https://nginx.org/download/nginx-$NGINX_VERSION.tar.gz \
-  && tar -zxC /usr/src -f nginx.tar.gz && rm nginx.tar.gz && cd /usr/src/nginx-$NGINX_VERSION \
-  && ./configure --prefix=/etc/nginx \
+  && tar -zxC /usr/src -f nginx.tar.gz && rm nginx.tar.gz
+
+# configure nginx
+RUN cd /usr/src/nginx-$NGINX_VERSION && ./configure \
+  --with-ld-opt='-Wl,-z,relro -Wl,-z,now -fPIC' \
+  --prefix=/etc/nginx \
   --sbin-path=/usr/sbin/nginx \
   --modules-path=/usr/lib/nginx/modules \
   --conf-path=/etc/nginx/nginx.conf \
@@ -88,9 +95,8 @@ RUN cd /usr/src \
   --with-cc-opt=-Wno-error \
   --with-select_module \
   --with-poll_module \
-  --with-cc-opt="-I/usr/src/boringssl/include" \
-  --with-ld-opt="-L/usr/src/boringssl/build/crypto -L/usr/src/boringssl/build/ssl" \
-  --build="docker-nginx ($TAG) boringssl-$(git --git-dir=/usr/src/boringssl/.git rev-parse --short HEAD) ngx_brotli-$(git --git-dir=/usr/src/ngx_brotli/.git rev-parse --short HEAD) njs-$(git --git-dir=/usr/src/njs/.git rev-parse --short HEAD)"
+  --with-openssl=/usr/src/libressl \
+  --build="docker-nginx ($TAG) libressl-$(git --git-dir=/usr/src/libressl/.git rev-parse --short HEAD) ngx_brotli-$(git --git-dir=/usr/src/ngx_brotli/.git rev-parse --short HEAD) njs-$(git --git-dir=/usr/src/njs/.git rev-parse --short HEAD)"
 
 # build nginx
 RUN cd /usr/src/nginx-$NGINX_VERSION \
