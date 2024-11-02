@@ -140,4 +140,4 @@ EXPOSE 80 443
 STOPSIGNAL SIGTERM
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
-CMD ["nginx", "-g", "daemon off"]
+CMD ["nginx", "-g", "daemon off;"]
