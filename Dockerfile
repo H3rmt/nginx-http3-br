@@ -1,8 +1,7 @@
 FROM alpine:latest@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf AS builder
 
-ENV NGINX_VERSION=1.29.4
-ENV NJS_VERSION=0.9.5
-ENV LIBRESSL_VERSION=libressl-4.2.1
+ENV NGINX_VERSION=1.31.9
+ENV LIBRESSL_VERSION=libressl-4.4.1
 ENV BROTLI_BRANCH=master
 
 ARG TAG=unspecified
@@ -30,10 +29,9 @@ RUN cd /usr/src \
 
 # RUN ls -la /usr/src/libressl && exit 1
 
-# clone brotli and njs
+# clone brotli
 RUN cd /usr/src \
-  && git clone --branch $BROTLI_BRANCH --depth=1 --recursive --shallow-submodules https://github.com/google/ngx_brotli \
-  && git clone --branch $NJS_VERSION   --depth=1 --recursive --shallow-submodules https://github.com/nginx/njs 
+  && git clone --branch $BROTLI_BRANCH --depth=1 --recursive --shallow-submodules https://github.com/google/ngx_brotli
 
 # clone nginx
 RUN cd /usr/src \
@@ -91,12 +89,11 @@ RUN cd /usr/src/nginx-$NGINX_VERSION && ./configure \
   --with-http_v2_module \
   --with-http_v3_module \
   --add-module=/usr/src/ngx_brotli \
-  --add-module=/usr/src/njs/nginx \
   --with-cc-opt=-Wno-error \
   --with-select_module \
   --with-poll_module \
   --with-openssl=/usr/src/libressl \
-  --build="docker-nginx ($TAG) $LIBRESSL_VERSION ngx_brotli-$(git --git-dir=/usr/src/ngx_brotli/.git rev-parse --short HEAD) njs-$(git --git-dir=/usr/src/njs/.git rev-parse --short HEAD)"
+  --build="docker-nginx ($TAG) $LIBRESSL_VERSION ngx_brotli-$(git --git-dir=/usr/src/ngx_brotli/.git rev-parse --short HEAD)"
 
 # build nginx
 RUN cd /usr/src/nginx-$NGINX_VERSION \
